@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// NextAuth Models
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("USER") // ADMIN, USER, MANAGER
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ERP Domain Models
+model Employee {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique // e.g. EMP-2024-001
+  name        String
+  role        String
+  department  String
+  status      String   @default("Active") // Active, On Leave, Resigned
+  performance Float?
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lead {
+  id           String      @id @default(cuid())
+  leadId       String      @unique // e.g. LD-001
+  clientName   String
+  contact      String?
+  projectType  String?     // Residential, Commercial, etc.
+  status       String      @default("Enquiry") // Enquiry, Measured, Quoted, Converted, Rejected
+  source       String?     // Reference, Social, Direct
+  date         DateTime    @default(now())
+  measurements Measurement[]
+  quotations   Quotation[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Measurement {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  width     Float
+  height    Float
+  location  String?  // e.g. Living Room, Bedroom 1
+  type      String?  // Sliding, Casement, etc.
+  createdAt DateTime @default(now())
+}
+
+model Quotation {
+  id           String   @id @default(cuid())
+  quotationId  String   @unique // e.g. QT-2026-001
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  client       String
+  amount       Float
+  status       String   @default("Draft") // Draft, Sent, Approved, Expired
+  date         DateTime @default(now())
+  validUntil   DateTime
+  jobOrders    JobOrder[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model JobOrder {
+  id          String   @id @default(cuid())
+  jobOrderId  String   @unique // e.g. JO-2026-001
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  name        String
+  client      String
+  progress    Int      @default(0)
+  status      String   @default("Pending") // Pending, Fabrication, Installation, Completed
+  startDate   DateTime @default(now())
+  deadline    DateTime
+  costing     Costing?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Costing {
+  id           String   @id @default(cuid())
+  jobOrderId   String   @unique
+  jobOrder     JobOrder @relation(fields: [jobOrderId], references: [id])
+  materialCost Float    @default(0)
+  bendingCost  Float    @default(0)
+  hardwareCost Float    @default(0)
+  glassCost    Float    @default(0)
+  transportCost Float   @default(0)
+  totalCost    Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model InventoryItem {
+  id        String   @id @default(cuid())
+  name      String
+  category  String   // Profile, Hardware, Glass, EPDM
+  stock     Int      @default(0)
+  unit      String   // Meters, Pcs, Kg
+  minStock  Int      @default(10)
+  status    String   @default("In Stock") // In Stock, Low Stock, Out of Stock
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  invoiceId String   @unique // e.g. INV-001
+  client    String
+  amount    Float
+  status    String   @default("Pending") // Paid, Pending, Overdue
+  method    String?  // Bank Transfer, UPI, Cheque
+  date      DateTime @default(now())
+  dueDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
