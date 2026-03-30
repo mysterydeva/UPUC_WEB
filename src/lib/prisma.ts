@@ -3,7 +3,7 @@ import type { PrismaClient as PrismaClientType } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 const globalForPrisma = globalThis as unknown as {
-    prisma: any | undefined;
+    prisma: PrismaClientType | undefined;
 };
 
 const adapter = new PrismaBetterSqlite3({
