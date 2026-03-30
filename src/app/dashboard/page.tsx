@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     BarChart2,
@@ -22,10 +23,49 @@ export default function DashboardPage() {
         { title: "Pending Invoices", value: "14", icon: <Clock className="text-amber-600" />, trend: "Due soon", color: "bg-amber-50" },
     ];
 
-    const alerts = [
-        { title: "Low Stock Warning", subtitle: "UPVC Profile - White is below 50ft", icon: <AlertTriangle size={18} />, color: "text-red-500", bgColor: "bg-red-50" },
-        { title: "Overdue Invoice", subtitle: "INV-2024-001 - Build Corp", icon: <Clock size={18} />, color: "text-amber-500", bgColor: "bg-amber-50" },
+    const [chartFilter, setChartFilter] = useState("Last 6 Months");
+    const [liveAlerts, setLiveAlerts] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        import("@/app/actions/dashboard-actions").then((m) => {
+            m.getDashboardAlerts().then((res) => {
+                if (res.success) {
+                    const newAlerts: any[] = [];
+                    res.lowStock?.forEach((item: any) => {
+                        newAlerts.push({
+                            title: "Low Stock Warning",
+                            subtitle: `${item.name} is below ${item.minStock}${item.unit}`,
+                            icon: <AlertTriangle size={18} />,
+                            color: "text-red-500",
+                            bgColor: "bg-red-50"
+                        });
+                    });
+                    res.overdueInvoices?.forEach((inv: any) => {
+                        newAlerts.push({
+                            title: "Overdue Invoice",
+                            subtitle: `${inv.invoiceId} - ${inv.client}`,
+                            icon: <Clock size={18} />,
+                            color: "text-amber-500",
+                            bgColor: "bg-amber-50"
+                        });
+                    });
+                    setLiveAlerts(newAlerts);
+                }
+                setIsLoading(false);
+            });
+        });
+    }, []);
+
+    const alerts = isLoading ? [
+        { title: "Loading alerts...", subtitle: "Please wait", icon: <Clock size={18} />, color: "text-zinc-500", bgColor: "bg-zinc-50" }
+    ] : liveAlerts.length > 0 ? liveAlerts : [
+        { title: "All Clear", subtitle: "No critical alerts at the moment", icon: <AlertTriangle size={18} />, color: "text-emerald-500", bgColor: "bg-emerald-50" }
     ];
+
+    const chartData = chartFilter === "Last 12 Months"
+        ? [30, 40, 45, 65, 35, 85, 55, 75, 90, 80, 60, 100]
+        : [45, 65, 35, 85, 55, 75];
 
     return (
         <>
@@ -46,7 +86,11 @@ export default function DashboardPage() {
                 <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 border border-zinc-100 premium-shadow">
                     <div className="flex items-center justify-between mb-8">
                         <h3 className="text-xl font-bold text-primary">Monthly Profit Analytics</h3>
-                        <select className="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/10">
+                        <select
+                            value={chartFilter}
+                            onChange={(e) => setChartFilter(e.target.value)}
+                            className="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/10"
+                        >
                             <option>Last 6 Months</option>
                             <option>Last 12 Months</option>
                         </select>
@@ -59,12 +103,12 @@ export default function DashboardPage() {
                         </div>
                         {/* Fake Graph Lines */}
                         <div className="absolute bottom-0 left-0 w-full h-1/2 flex items-end px-12 gap-4 pb-12">
-                            {[45, 65, 35, 85, 55, 75].map((h, i) => (
+                            {chartData.map((h, i) => (
                                 <motion.div
-                                    key={i}
+                                    key={i + chartFilter}
                                     initial={{ height: 0 }}
                                     animate={{ height: `${h}%` }}
-                                    transition={{ delay: 0.5 + (i * 0.1), duration: 1 }}
+                                    transition={{ delay: 0.2 + (i * 0.05), duration: 0.8 }}
                                     className="flex-grow bg-accent/20 hover:bg-accent/40 rounded-t-xl transition-colors"
                                 />
                             ))}
@@ -77,10 +121,10 @@ export default function DashboardPage() {
                     <div className="bg-white rounded-[2.5rem] p-8 border border-zinc-100 premium-shadow h-full">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-xl font-bold text-primary">Critical Alerts</h3>
-                            <span className="px-3 py-1 bg-red-50 text-red-500 text-xs font-bold rounded-full">3 New</span>
+                            <span className="px-3 py-1 bg-red-50 text-red-500 text-xs font-bold rounded-full">{liveAlerts.length} New</span>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                             {alerts.map((alert, idx) => (
                                 <AlertItem
                                     key={idx}

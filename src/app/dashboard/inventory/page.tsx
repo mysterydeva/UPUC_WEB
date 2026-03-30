@@ -1,113 +1,93 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-    Box,
-    Search,
-    Plus,
-    MoreVertical,
-    AlertCircle,
-    Download,
-    X,
-    PlusCircle
-} from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { Box, Search, Plus, Upload, Layers, History, MoreVertical, FileDown, ScanBarcode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
-import { InventoryItem } from "@/types";
+import { bulkImportInventory } from "@/app/actions/import-actions";
+import Papa from "papaparse";
+import ReactBarcode from "react-barcode";
+import { cn } from "@/lib/utils";
 
 export default function InventoryPage() {
+    const { data: session } = useSession();
+    const businessId = session?.user?.businessId;
+
+    const [items, setItems] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeCategory, setActiveCategory] = useState("All");
-    const [isAddingItem, setIsAddingItem] = useState(false);
+    const [categories, setCategories] = useState<string[]>(["All"]);
 
-    const initialData: (InventoryItem & { price: string })[] = [
-        { id: "UPVC-001", name: "UPVC Profile - White", category: "Profiles", stock: 1200, unit: "ft", status: "In Stock", price: "₹45/ft" },
-        { id: "UPVC-002", name: "UPVC Profile - Wood Grain", category: "Profiles", stock: 45, unit: "ft", status: "Low Stock", price: "₹65/ft" },
-        { id: "HW-402", name: "Heavy Duty Friction Stays", category: "Hardware", stock: 150, unit: "pcs", status: "In Stock", price: "₹280/pc" },
-        { id: "GL-101", name: "6mm Toughened Glass", category: "Glass", stock: 800, unit: "sqft", status: "In Stock", price: "₹120/sqft" },
-        { id: "HW-901", name: "Multi-point Lock Mechanism", category: "Hardware", stock: 12, unit: "pcs", status: "Out of Stock", price: "₹1,200/pc" },
-        { id: "UPVC-005", name: "Beading Profile - Black", category: "Profiles", stock: 450, unit: "ft", status: "In Stock", price: "₹25/ft" },
-    ];
+    const loadData = async () => {
+        if (!businessId) return;
+        const { getInventoryItems } = await import("@/app/actions/inventory-actions");
+        const res = await getInventoryItems(businessId);
+        setItems(res || []);
 
-    const categories = ["All", "Profiles", "Hardware", "Glass"];
+        const cats = new Set(res.map((r: any) => r.category));
+        setCategories(["All", ...Array.from(cats)]);
+    };
+
+    useEffect(() => { loadData(); }, [businessId]);
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length || !businessId) return;
+        const file = e.target.files[0];
+        Papa.parse(file, {
+            header: true,
+            complete: async (results) => {
+                const data = results.data as any[];
+                if (data.length > 0) {
+                    const res = await bulkImportInventory(businessId, data);
+                    if (res.success) {
+                        alert(`Successfully imported ${res.count} items!`);
+                        loadData();
+                    } else alert("Import failed check console");
+                }
+            }
+        });
+    };
+
+    const generateCSVTemplate = () => {
+        const headers = "name,category,stock,unit,price,taxRate,barcode\nProfile A,Profiles,100,pcs,1200,18,8901234567890\n";
+        const blob = new Blob([headers], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "inventory_bulk_import_template.csv";
+        a.click();
+    };
 
     const filteredData = useMemo(() => {
-        return initialData.filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.id.toLowerCase().includes(searchQuery.toLowerCase());
+        return items.filter(item => {
+            const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.barcode && item.barcode.includes(searchQuery));
             const matchesCategory = activeCategory === "All" || item.category === activeCategory;
             return matchesSearch && matchesCategory;
         });
-    }, [searchQuery, activeCategory]);
+    }, [searchQuery, activeCategory, items]);
 
     return (
         <div className="space-y-8 pb-12">
-            <PageHeader
-                title="Inventory Management"
-                description="Track and manage your UPVC manufacturing raw materials."
-                icon={<Box size={24} />}
-                iconBgColor="bg-orange-500/10"
-                iconColor="text-orange-600"
-            >
+            <PageHeader title="Enterprise Inventory" description="Real-time stock tracking with Warehouse & Barcode Support." icon={<Box size={24} />} iconBgColor="bg-orange-500/10" iconColor="text-orange-600">
                 <div className="flex items-center gap-3">
-                    <button className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center gap-2 text-sm font-medium text-text-secondary">
-                        <Download size={18} /> Export CSV
-                    </button>
-                    <button
-                        onClick={() => setIsAddingItem(true)}
-                        className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-light transition-all premium-shadow flex items-center gap-2 text-sm font-bold active:scale-95"
-                    >
-                        <Plus size={20} /> Add New Item
-                    </button>
+                    <button onClick={generateCSVTemplate} className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 flex items-center gap-2 text-sm font-medium text-text-secondary"><FileDown size={18} /> CSV Template</button>
+                    <label className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 flex items-center gap-2 text-sm font-medium text-text-secondary cursor-pointer">
+                        <Upload size={18} /> Bulk Import
+                        <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    <button className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-light transition-all premium-shadow flex items-center gap-2 text-sm font-bold"><Plus size={20} /> Add Item</button>
                 </div>
             </PageHeader>
 
-            {/* Stats Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                    { label: "Total Items", value: initialData.length, sub: `across ${categories.length - 1} categories`, color: "bg-blue-500" },
-                    { label: "Low Stock Alert", value: initialData.filter(i => i.status !== "In Stock").length, sub: "Requires immediate reorder", color: "bg-orange-500" },
-                    { label: "Value in Hand", value: "₹ 15.4 Lakhs", sub: "Current inventory valuation", color: "bg-emerald-500" },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-3xl border border-zinc-100 premium-shadow">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className={cn("w-2 h-8 rounded-full", stat.color)} />
-                            <span className="text-sm font-bold text-text-secondary uppercase tracking-wider">{stat.label}</span>
-                        </div>
-                        <div className="text-3xl font-bold text-primary">{stat.value}</div>
-                        <p className="text-xs text-text-secondary mt-1">{stat.sub}</p>
-                    </div>
-                ))}
-            </div>
-
-            {/* Table Section */}
-            <div className="bg-white rounded-[2.5rem] border border-zinc-100 premium-shadow overflow-hidden">
-                <div className="p-6 border-b border-zinc-50 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-white rounded-[3rem] border border-zinc-100 premium-shadow overflow-hidden">
+                <div className="p-8 border-b border-zinc-50 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="relative w-full md:w-96">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search by name or ID..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-12 pr-6 py-2.5 bg-zinc-50 border border-zinc-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all text-sm"
-                        />
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                        <input type="text" placeholder="Search by name or Barcode..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-14 pr-6 py-3.5 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/10 transition-all text-sm" />
                     </div>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
+                    <div className="flex items-center gap-2 overflow-x-auto">
                         {categories.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={cn(
-                                    "px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
-                                    activeCategory === cat
-                                        ? "bg-primary text-white premium-shadow"
-                                        : "bg-zinc-50 text-text-secondary hover:bg-zinc-100"
-                                )}
-                            >
-                                {cat}
-                            </button>
+                            <button key={cat as string} onClick={() => setActiveCategory(cat as string)} className={cn("px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap", activeCategory === cat ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-zinc-50 text-text-secondary hover:bg-zinc-100")}>{cat as string}</button>
                         ))}
                     </div>
                 </div>
@@ -115,137 +95,49 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-zinc-50 text-left text-xs font-bold text-text-secondary uppercase tracking-widest">
-                                <th className="px-8 py-4">Item Details</th>
-                                <th className="px-6 py-4">Category</th>
-                                <th className="px-6 py-4">Current Stock</th>
-                                <th className="px-6 py-4">Unit Price</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4"></th>
+                            <tr className="bg-zinc-50/50 text-left text-xs font-black text-text-secondary uppercase tracking-widest">
+                                <th className="px-10 py-5">Item Details</th>
+                                <th className="px-6 py-5">Identities & Barcode</th>
+                                <th className="px-6 py-5">Stock Availability</th>
+                                <th className="px-6 py-5">Unit Price</th>
+                                <th className="px-6 py-5">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-50">
                             {filteredData.length > 0 ? filteredData.map((item, i) => (
-                                <motion.tr
-                                    key={item.id}
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    className="hover:bg-zinc-50/50 transition-colors group"
-                                >
-                                    <td className="px-8 py-5">
-                                        <div className="font-bold text-primary">{item.name}</div>
-                                        <div className="text-xs text-text-secondary font-mono">{item.id}</div>
+                                <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors group">
+                                    <td className="px-10 py-6">
+                                        <div className="font-bold text-primary text-base">{item.name}</div>
+                                        <div className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mt-1">{item.category}</div>
                                     </td>
-                                    <td className="px-6 py-5">
-                                        <span className="text-sm font-medium text-text-secondary bg-zinc-100 px-3 py-1 rounded-full uppercase text-[10px] tracking-wider">
-                                            {item.category}
-                                        </span>
+                                    <td className="px-6 py-6">
+                                        <div className="space-y-2">
+                                            {item.barcode ? (
+                                                <div className="overflow-hidden rounded-md border border-zinc-100 inline-block bg-white p-1">
+                                                    <ReactBarcode value={item.barcode} height={30} width={1.2} fontSize={10} margin={0} />
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] font-bold text-zinc-400 flex items-center gap-1"><ScanBarcode size={12} /> No Barcode</div>
+                                            )}
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-5 font-bold text-primary">
-                                        {item.stock} <span className="text-xs text-text-secondary font-medium ml-1">{item.unit}</span>
+                                    <td className="px-6 py-6">
+                                        <div className="font-black text-primary text-lg">{item.stock} <span className="text-[10px] text-text-secondary font-black ml-1 uppercase">{item.unit}</span></div>
                                     </td>
-                                    <td className="px-6 py-5 text-sm font-medium text-primary">{item.price}</td>
-                                    <td className="px-6 py-5">
-                                        <div className={cn(
-                                            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase",
-                                            item.status === "In Stock" ? "bg-emerald-50 text-emerald-600" :
-                                                item.status === "Low Stock" ? "bg-orange-50 text-orange-600" :
-                                                    "bg-red-50 text-red-600"
-                                        )}>
-                                            {item.status === "Low Stock" && <AlertCircle size={12} />}
+                                    <td className="px-6 py-6 text-sm font-bold text-primary">₹{item.price?.toLocaleString()}</td>
+                                    <td className="px-6 py-6">
+                                        <div className={cn("inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider", item.status === "In Stock" ? "bg-emerald-50 text-emerald-600" : item.status === "Low Stock" ? "bg-orange-50 text-orange-600" : "bg-red-50 text-red-600")}>
                                             {item.status}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-5">
-                                        <button className="p-2 rounded-lg hover:bg-zinc-200/50 text-zinc-300 opacity-0 group-hover:opacity-100 transition-all">
-                                            <MoreVertical size={16} />
-                                        </button>
-                                    </td>
-                                </motion.tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan={6} className="px-8 py-10 text-center text-text-secondary italic">
-                                        No items found matching your criteria.
-                                    </td>
                                 </tr>
+                            )) : (
+                                <tr><td colSpan={5} className="p-10 text-center text-zinc-400 font-bold italic">No inventory items. Use Bulk Import to add items.</td></tr>
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            {/* Add Item Modal */}
-            <AnimatePresence>
-                {isAddingItem && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsAddingItem(false)}
-                            className="absolute inset-0 bg-primary/20 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-white rounded-[2.5rem] w-full max-w-xl p-8 premium-shadow overflow-hidden"
-                        >
-                            <div className="flex items-center justify-between mb-8">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                                        <PlusCircle size={20} />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-primary">Add New Inventory Item</h3>
-                                </div>
-                                <button
-                                    onClick={() => setIsAddingItem(false)}
-                                    className="w-10 h-10 rounded-full hover:bg-zinc-100 flex items-center justify-center text-zinc-400 transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setIsAddingItem(false); }}>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Item Name</label>
-                                        <input type="text" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="e.g. Glass Polish" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Category</label>
-                                        <select className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/20">
-                                            <option>Profiles</option>
-                                            <option>Hardware</option>
-                                            <option>Glass</option>
-                                            <option>Other</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Quantity</label>
-                                        <input type="number" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="0" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Unit</label>
-                                        <input type="text" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="ft, pcs, sqft" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Alert Level</label>
-                                        <input type="number" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="50" />
-                                    </div>
-                                </div>
-
-                                <button className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-light transition-all premium-shadow mt-4">
-                                    Save Item to Inventory
-                                </button>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }

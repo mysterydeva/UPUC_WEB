@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
     FileText,
     Search,
@@ -21,9 +21,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Quotation, QuotationItem } from "@/types";
 
 export default function QuotationsPage() {
+    console.log('🔄 QuotationsPage component rendering');
     const [searchQuery, setSearchQuery] = useState("");
     const [activeStatus, setActiveStatus] = useState("All");
     const [isAddingQuotation, setIsAddingQuotation] = useState(false);
+    const [quotations, setQuotations] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
 
     const initialQuotations: Quotation[] = [
         {
@@ -58,16 +62,77 @@ export default function QuotationsPage() {
         },
     ];
 
+    const loadQuotations = async () => {
+        console.log('🚀 Starting loadQuotations function');
+        try {
+            setIsLoading(true);
+            setError("");
+            console.log('📦 Importing getQuotations action');
+            
+            const { getQuotations } = await import("@/app/actions/quotation-actions");
+            console.log('📞 Calling getQuotations...');
+            const res = await getQuotations();
+            console.log('📊 getQuotations result:', res);
+            
+            if (res.success) {
+                console.log('✅ Successfully loaded quotations:', res.quotations?.length);
+                setQuotations(res.quotations || []);
+            } else {
+                console.log('❌ Failed to load quotations, using fallback data');
+                setQuotations(initialQuotations);
+            }
+        } catch (err) {
+            console.log('💥 Exception in loadQuotations:', err);
+            setError("Failed to load quotations");
+            setQuotations(initialQuotations);
+            console.error(err);
+        } finally {
+            console.log('🏁 loadQuotations finished, setting isLoading to false');
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        console.log('🎯 Quotations useEffect triggered');
+        loadQuotations();
+    }, []);
+
+    const handleStatusUpdate = async (id: string, status: string) => {
+        const { updateQuotationStatus } = await import("@/app/actions/quotation-actions");
+        await updateQuotationStatus(id, status);
+        await loadQuotations();
+    };
+
+    const handleConvertToJobOrder = async (id: string) => {
+        const { convertToJobOrder } = await import("@/app/actions/job-order-actions");
+        await convertToJobOrder(id);
+        await loadQuotations();
+        alert("Converted to Job Order successfully!");
+    };
+
     const statuses = ["All", "Draft", "Sent", "Approved", "Rejected"];
 
+    const formatDate = (date: Date | string | null | undefined) => {
+        console.log('📅 Formatting date:', date);
+        if (!date) return 'N/A';
+        try {
+            const dateObj = typeof date === 'string' ? new Date(date) : date;
+            return dateObj.toLocaleDateString();
+        } catch {
+            return 'N/A';
+        }
+    };
+
     const filteredQuotations = useMemo(() => {
-        return initialQuotations.filter(qtn => {
-            const matchesSearch = qtn.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                qtn.id.toLowerCase().includes(searchQuery.toLowerCase());
+        console.log('🔍 Filtering quotations:', { quotationsCount: quotations.length, searchQuery, activeStatus });
+        const sourceData = quotations.length > 0 ? quotations : initialQuotations;
+        return sourceData.filter(qtn => {
+            const matchesSearch = (qtn.clientName || qtn.client).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (qtn.quotationId || qtn.id).toLowerCase().includes(searchQuery.toLowerCase());
             const matchesStatus = activeStatus === "All" || qtn.status === activeStatus;
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, activeStatus]);
+    }, [searchQuery, activeStatus, quotations]);
 
     return (
         <div className="space-y-10 pb-12">
@@ -155,30 +220,30 @@ export default function QuotationsPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total Value</span>
-                                    <span className="text-xl font-bold text-primary">₹ {qtn.totalAmount.toLocaleString()}</span>
+                                    <span className="text-xl font-bold text-primary">₹ {qtn.totalAmount?.toLocaleString() || '0'}</span>
                                 </div>
                                 <div className="flex flex-col text-right">
                                     <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Date Created</span>
-                                    <span className="text-sm font-medium text-text-secondary">{qtn.date}</span>
+                                    <span className="text-sm font-medium text-text-secondary">{formatDate(qtn.date)}</span>
                                 </div>
                             </div>
 
                             <div className="pt-4 border-t border-zinc-50 flex items-center justify-between">
                                 <div className="flex gap-2">
-                                    <button className="h-9 px-4 rounded-xl bg-zinc-50 text-text-secondary text-xs font-bold flex items-center gap-2 hover:bg-zinc-100 transition-all">
+                                    <button onClick={() => window.print()} className="h-9 px-4 rounded-xl bg-zinc-50 text-text-secondary text-xs font-bold flex items-center gap-2 hover:bg-zinc-100 transition-all">
                                         <Download size={14} /> Download PDF
                                     </button>
-                                    <button className="h-9 px-4 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold flex items-center gap-2 hover:bg-blue-100 transition-all">
+                                    <button onClick={() => alert("Active quotations cannot be edited without a revision. Clone to draft to edit.")} className="h-9 px-4 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold flex items-center gap-2 hover:bg-blue-100 transition-all">
                                         Edit Details
                                     </button>
                                 </div>
                                 {qtn.status === "Approved" ? (
-                                    <button className="h-9 px-4 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-200">
+                                    <button onClick={() => handleConvertToJobOrder(qtn.id || qtn.quotationId)} className="h-9 px-4 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-200">
                                         Convert to Job Order <ArrowUpRight size={14} />
                                     </button>
                                 ) : (
-                                    <button className="h-9 px-4 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all">
-                                        Mark as Sent
+                                    <button onClick={() => handleStatusUpdate(qtn.id || qtn.quotationId, qtn.status === "Sent" ? "Approved" : "Sent")} className="h-9 px-4 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all">
+                                        {qtn.status === "Sent" ? "Mark as Approved" : "Mark as Sent"}
                                     </button>
                                 )}
                             </div>

@@ -44,8 +44,12 @@ model User {
   emailVerified DateTime?
   image         String?
   role          String    @default("USER") // ADMIN, USER, MANAGER
+  permissions   String?   // JSON structured permissions
   accounts      Account[]
   sessions      Session[]
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  auditLogs     AuditLog[]
 }
 
 model VerificationToken {
@@ -56,16 +60,28 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ERP Domain Models
-model Employee {
+// Multi-tenancy Model
+model Business {
   id          String   @id @default(cuid())
-  employeeId  String   @unique // e.g. EMP-2024-001
   name        String
-  role        String
-  department  String
-  status      String   @default("Active") // Active, On Leave, Resigned
-  performance Float?
-  image       String?
+  gstin       String?
+  address     String?
+  phone       String?
+  email       String?
+  logo        String?
+  currency    String   @default("INR")
+  users       User[]
+  leads       Lead[]
+  inventory   InventoryItem[]
+  invoices    Invoice[]
+  expenses    Expense[]
+  warehouses  Warehouse[]
+  parties     Party[]
+  bankAccounts BankAccount[]
+  transactions Transaction[]
+  vouchers    Voucher[]
+  batches     Batch[]
+  auditLogs   AuditLog[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -73,6 +89,8 @@ model Employee {
 model Lead {
   id           String      @id @default(cuid())
   leadId       String      @unique // e.g. LD-001
+  businessId   String?
+  business     Business?   @relation(fields: [businessId], references: [id])
   clientName   String
   contact      String?
   projectType  String?     // Residential, Commercial, etc.
@@ -141,27 +159,167 @@ model Costing {
   updatedAt    DateTime @updatedAt
 }
 
+model Warehouse {
+  id          String   @id @default(cuid())
+  name        String
+  location    String?
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  inventory   InventoryItem[]
+}
+
 model InventoryItem {
-  id        String   @id @default(cuid())
-  name      String
-  category  String   // Profile, Hardware, Glass, EPDM
-  stock     Int      @default(0)
-  unit      String   // Meters, Pcs, Kg
-  minStock  Int      @default(10)
-  status    String   @default("In Stock") // In Stock, Low Stock, Out of Stock
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // Profile, Hardware, Glass, EPDM
+  stock       Int      @default(0)
+  unit        String   // Meters, Pcs, Kg
+  minStock    Int      @default(10)
+  status      String   @default("In Stock") // In Stock, Low Stock, Out of Stock
+  barcode     String?  // Scannable barcode EAN
+  imageUrl    String?  // Base64/link
+  customFields String? // JSON custom columns
+  price       Float    @default(0)
+  taxRate     Float    @default(18)
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  movements   StockMovement[]
+  batches     Batch[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StockMovement {
+  id              String   @id @default(cuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  quantity        Int
+  type            String   // IN, OUT
+  reference       String?  // e.g. Purchase Order ID, Job Order ID
+  batchNumber     String?
+  serialNumber    String?
+  date            DateTime @default(now())
 }
 
 model Invoice {
-  id        String   @id @default(cuid())
-  invoiceId String   @unique // e.g. INV-001
-  client    String
-  amount    Float
-  status    String   @default("Pending") // Paid, Pending, Overdue
-  method    String?  // Bank Transfer, UPI, Cheque
-  date      DateTime @default(now())
-  dueDate   DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  invoiceId   String   @unique // e.g. INV-001
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  client      String
+  subTotal    Float    @default(0)
+  taxRate     Float    @default(18) // e.g. 18 for 18%
+  taxAmount   Float    @default(0)
+  discount    Float    @default(0)
+  totalAmount Float    @default(0)
+  gstType     String?  // CGST/SGST or IGST
+  status      String   @default("Pending") // Paid, Pending, Overdue, Proforma
+  method      String?  // Bank Transfer, UPI, Cheque
+  date        DateTime @default(now())
+  dueDate     DateTime
+  transactions Transaction[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  category    String   // Rent, Electricity, Salaries, Other
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  transactions Transaction[]
+  createdAt   DateTime @default(now())
+}
+
+model Party {
+  id           String      @id @default(cuid())
+  name         String
+  mobile       String?
+  gstin        String?
+  businessId   String?
+  business     Business?   @relation(fields: [businessId], references: [id])
+  loyaltyPoints Int        @default(0)
+  vouchers     Voucher[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String   // CREATE, UPDATE, DELETE, PRINT, EXPORT
+  entity      String   // INVOICE, INVENTORY, PARTY
+  entityId    String
+  details     String?  // JSON string of changes
+  timestamp   DateTime @default(now())
+}
+
+model BankAccount {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  name        String   // e.g. "HDFC Current Account"
+  accountNo   String?
+  ifscCode    String?
+  branchName  String?
+  balance     Float    @default(0)
+  transactions Transaction[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  bankAccountId String?
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+  type        String   // "Payment In", "Payment Out", "Bank Transfer"
+  amount      Float
+  reference   String?  // UTR / Cheque No
+  date        DateTime @default(now())
+  linkedInvoiceId String?
+  linkedInvoice   Invoice? @relation(fields: [linkedInvoiceId], references: [id])
+  linkedExpenseId String?
+  linkedExpense   Expense? @relation(fields: [linkedExpenseId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model Voucher {
+  id          String   @id @default(cuid())
+  voucherId   String   @unique // e.g. PRO-2024-001 or CN-2024-001
+  type        String   // Proforma Invoice, Delivery Challan, Credit Note, Debit Note
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id])
+  partyId     String?
+  party       Party?   @relation(fields: [partyId], references: [id])
+  amount      Float    @default(0)
+  status      String   @default("Draft")
+  date        DateTime @default(now())
+  referenceType String? // e.g. "Invoice", "Quotation", "JobOrder"
+  referenceId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Batch {
+  id              String   @id @default(cuid())
+  batchNumber     String
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  businessId      String?
+  business        Business? @relation(fields: [businessId], references: [id])
+  manufacturingDate DateTime?
+  expiryDate      DateTime?
+  quantity        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

@@ -68,3 +68,32 @@ body {
   background: var(--accent);
   color: white;
 }
+
+/* Print Layout Optimization */
+@media print {
+  @page {
+    margin: 0.5cm;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  aside, header, nav, .no-print {
+    display: none !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Ensure background colors are printed (e.g. table headers) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -21,14 +21,6 @@ export interface Alert {
     bgColor?: string;
 }
 
-export interface Employee {
-    id: string;
-    name: string;
-    role: string;
-    department: string;
-    status: 'Active' | 'On Leave' | 'Terminated';
-    avatar?: string;
-}
 
 export interface Project {
     id: string;

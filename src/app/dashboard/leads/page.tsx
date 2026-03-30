@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
     UserPlus,
     Search,
@@ -11,35 +11,85 @@ import {
     User,
     Calendar,
     ArrowUpRight,
-    MoreHorizontal
+    MoreHorizontal,
+    Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
-import { Lead } from "@/types";
+import { useSession } from "next-auth/react";
+
+interface DatabaseLead {
+    id: string;
+    leadId: string;
+    clientName: string;
+    contact?: string;
+    projectType?: string;
+    status: string;
+    source?: string;
+    date: Date | string;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+    measurements: any[];
+    quotations: any[];
+}
 
 export default function LeadsPage() {
+    const { data: session } = useSession();
+    const businessId = session?.user?.businessId;
+    
     const [searchQuery, setSearchQuery] = useState("");
     const [activeStatus, setActiveStatus] = useState("All");
     const [isAddingLead, setIsAddingLead] = useState(false);
+    const [leads, setLeads] = useState<DatabaseLead[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    const initialLeads: Lead[] = [
-        { id: "LD-2024-001", clientName: "Rajesh Kumar", location: "Koramangala, Bangalore", contactNumber: "+91 98450 12345", status: "New", date: "2024-03-01" },
-        { id: "LD-2024-002", clientName: "Sneha Reddy", location: "Indiranagar, Bangalore", contactNumber: "+91 98450 67890", status: "Follow-up", date: "2024-02-28" },
-        { id: "LD-2024-003", clientName: "Buildwell Developers", location: "Whitefield, Bangalore", contactNumber: "+91 80 2345 6789", status: "Converted", date: "2024-02-25" },
-        { id: "LD-2024-004", clientName: "Amitabh Bachchan", location: "Juhu, Mumbai", contactNumber: "+91 22 1234 5678", status: "Lost", date: "2024-02-20" },
-    ];
+    const statuses = ["All", "Enquiry", "Measured", "Quoted", "Converted", "Rejected"];
 
-    const statuses = ["All", "New", "Follow-up", "Converted", "Lost"];
+    const formatDate = (date: Date | string | null | undefined) => {
+        if (!date) return 'N/A';
+        try {
+            const dateObj = typeof date === 'string' ? new Date(date) : date;
+            return dateObj.toLocaleDateString();
+        } catch {
+            return 'N/A';
+        }
+    };
+
+    const loadLeads = async () => {
+        try {
+            setIsLoading(true);
+            setError("");
+            
+            const { getLeads } = await import("@/app/actions/lead-actions");
+            const result = await getLeads(businessId);
+            
+            if (result.success && result.leads) {
+                setLeads(result.leads as DatabaseLead[]);
+            } else {
+                setError(result.error || "Failed to load leads");
+            }
+        } catch (err) {
+            setError("Failed to load leads");
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadLeads();
+    }, [businessId]);
 
     const filteredLeads = useMemo(() => {
-        return initialLeads.filter(lead => {
+        return leads.filter(lead => {
             const matchesSearch = lead.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                lead.location.toLowerCase().includes(searchQuery.toLowerCase());
+                lead.contact?.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesStatus = activeStatus === "All" || lead.status === activeStatus;
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, activeStatus]);
+    }, [searchQuery, activeStatus, leads]);
 
     return (
         <div className="space-y-10 pb-12">
@@ -88,10 +138,44 @@ export default function LeadsPage() {
                 </div>
             </div>
 
+            {/* Loading State */}
+            {isLoading && (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <Loader2 className="animate-spin text-primary mb-4" size={48} />
+                    <p className="text-text-secondary">Loading leads...</p>
+                </div>
+            )}
+
+            {/* Error State */}
+            {error && !isLoading && (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md">
+                        <p className="text-red-600 font-medium mb-2">Error loading leads</p>
+                        <p className="text-red-500 text-sm mb-4">{error}</p>
+                        <button
+                            onClick={loadLeads}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Empty State */}
+            {!isLoading && !error && filteredLeads.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <UserPlus className="text-text-tertiary mb-4" size={48} />
+                    <p className="text-text-secondary mb-2">No leads found</p>
+                    <p className="text-text-tertiary text-sm">Start by capturing your first lead</p>
+                </div>
+            )}
+
             {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <AnimatePresence mode="popLayout">
-                    {filteredLeads.length > 0 ? filteredLeads.map((lead, i) => (
+            {!isLoading && !error && filteredLeads.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <AnimatePresence mode="popLayout">
+                        {filteredLeads.map((lead, i) => (
                         <motion.div
                             key={lead.id}
                             layout
@@ -126,32 +210,29 @@ export default function LeadsPage() {
 
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3 text-sm text-text-secondary font-medium">
-                                    <Phone size={16} className="text-zinc-400" /> {lead.contactNumber}
+                                    <Phone size={16} className="text-zinc-400" /> {lead.contact || 'N/A'}
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-text-secondary font-medium">
-                                    <MapPin size={16} className="text-zinc-400" /> {lead.location}
+                                    <MapPin size={16} className="text-zinc-400" /> {lead.projectType || 'N/A'}
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-text-secondary font-medium">
-                                    <Calendar size={16} className="text-zinc-400" /> Received: {lead.date}
+                                    <Calendar size={16} className="text-zinc-400" /> Received: {formatDate(lead.date)}
                                 </div>
                             </div>
 
                             <div className="pt-4 border-t border-zinc-50 flex items-center justify-between">
-                                <button className="h-9 px-4 rounded-xl bg-orange-50 text-orange-600 text-xs font-bold flex items-center gap-2 hover:bg-orange-100 transition-all">
+                                <button onClick={() => alert(`Opening Measurement Sheet for ${lead.clientName}`)} className="h-9 px-4 rounded-xl bg-orange-50 text-orange-600 text-xs font-bold flex items-center gap-2 hover:bg-orange-100 transition-all">
                                     Measurement Details <ArrowUpRight size={14} />
                                 </button>
-                                <button className="h-9 px-4 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all">
+                                <button onClick={() => window.location.href = '/dashboard/quotations'} className="h-9 px-4 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all">
                                     Create Quotation
                                 </button>
                             </div>
                         </motion.div>
-                    )) : (
-                        <div className="col-span-full py-20 text-center text-text-secondary italic">
-                            No leads found matching your criteria.
-                        </div>
-                    )}
-                </AnimatePresence>
-            </div>
+                    ))}
+                    </AnimatePresence>
+                </div>
+            )}
 
             {/* Add Lead Modal */}
             <AnimatePresence>

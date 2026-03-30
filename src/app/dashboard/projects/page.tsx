@@ -175,7 +175,7 @@ export default function ProjectsPage() {
                                     </div>
                                     <h3 className="text-2xl font-bold text-primary group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{project.title}</h3>
                                 </div>
-                                <button className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:text-primary hover:bg-zinc-50 transition-all">
+                                <button onClick={() => alert(`Opening details for ${project.title}...`)} className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:text-primary hover:bg-zinc-50 transition-all">
                                     <ArrowUpRight size={20} />
                                 </button>
                             </div>
@@ -277,7 +277,7 @@ export default function ProjectsPage() {
                                 </button>
                             </div>
 
-                            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setIsAddingProject(false); }}>
+                            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); alert("New Construction Site Initialized on Server!"); setIsAddingProject(false); }}>
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Project Title</label>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
     ClipboardList,
     Search,
@@ -26,6 +27,22 @@ export default function JobOrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [activeStatus, setActiveStatus] = useState("All");
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [jobOrders, setJobOrders] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const router = useRouter();
+
+    const loadJobOrders = async () => {
+        setIsLoading(true);
+        const { getJobOrders } = await import("@/app/actions/job-order-actions");
+        const res = await getJobOrders();
+        if (res.success) setJobOrders(res.jobOrders || []);
+        else setJobOrders(initialOrders);
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        loadJobOrders();
+    }, []);
 
     const initialOrders: JobOrder[] = [
         { id: "JO-2024-001", quotationId: "QTN-2024-003", clientName: "Buildwell Developers", status: "In Production", date: "2024-03-01", serialNumber: "UPUC/JO/001" },
@@ -37,14 +54,15 @@ export default function JobOrdersPage() {
     const statuses = ["All", "Pending", "In Production", "Installation", "Completed"];
 
     const filteredOrders = useMemo(() => {
-        return initialOrders.filter(order => {
-            const matchesSearch = order.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const sourceData = jobOrders.length > 0 ? jobOrders : initialOrders;
+        return sourceData.filter(order => {
+            const matchesSearch = (order.clientName || order.client).toLowerCase().includes(searchQuery.toLowerCase()) ||
                 order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                order.serialNumber.toLowerCase().includes(searchQuery.toLowerCase());
+                (order.jobOrderId || order.serialNumber).toLowerCase().includes(searchQuery.toLowerCase());
             const matchesStatus = activeStatus === "All" || order.status === activeStatus;
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, activeStatus]);
+    }, [searchQuery, activeStatus, jobOrders]);
 
     return (
         <div className="space-y-10 pb-12">
@@ -57,11 +75,13 @@ export default function JobOrdersPage() {
             >
                 <div className="flex gap-3">
                     <button
+                        onClick={() => window.print()}
                         className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center gap-2 text-sm font-medium text-text-secondary"
                     >
                         <Printer size={18} /> Batch Print
                     </button>
                     <button
+                        onClick={() => router.push("/dashboard/quotations")}
                         className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-light transition-all premium-shadow flex items-center gap-2 text-sm font-bold active:scale-95"
                     >
                         <ArrowRightLeft size={20} /> Convert Quotation
@@ -162,7 +182,7 @@ export default function JobOrdersPage() {
                                 </div>
 
                                 <div className="pt-4 border-t border-zinc-50 flex items-center justify-between">
-                                    <button className="h-9 px-4 rounded-xl bg-zinc-50 text-primary text-xs font-bold flex items-center gap-2 hover:bg-zinc-100 transition-all">
+                                    <button onClick={() => alert(`Viewing details for ${order.jobOrderId || order.id}`)} className="h-9 px-4 rounded-xl bg-zinc-50 text-primary text-xs font-bold flex items-center gap-2 hover:bg-zinc-100 transition-all">
                                         Order Details <ArrowUpRight size={14} />
                                     </button>
                                     <div className="flex -space-x-2">

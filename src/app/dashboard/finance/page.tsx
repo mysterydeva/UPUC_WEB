@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
     Wallet,
     ArrowDownLeft,
@@ -12,35 +12,99 @@ import {
     FileText,
     X,
     CreditCard,
-    Plus
+    Plus,
+    Tag,
+    Calculator,
+    Zap,
+    QrCode,
+    Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
+import { calculateGst, GstType } from "@/lib/gst-utils";
+import { createInvoice } from "@/app/actions/invoice-actions";
+import { useSession } from "next-auth/react";
+
+interface DatabaseInvoice {
+    id: string;
+    invoiceId: string;
+    client: string;
+    subTotal: number;
+    taxRate: number;
+    taxAmount: number;
+    discount: number;
+    totalAmount: number;
+    gstType?: string;
+    status: string;
+    method?: string;
+    date: string;
+    dueDate: string;
+    createdAt: string;
+    updatedAt: string;
+}
 
 export default function FinancePage() {
+    const { data: session } = useSession();
+    const businessId = session?.user?.businessId;
+    
     const [searchQuery, setSearchQuery] = useState("");
     const [activeStatus, setActiveStatus] = useState("All");
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+    const [invoices, setInvoices] = useState<DatabaseInvoice[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    const initialInvoices = [
-        { id: "INV-001", client: "Build Corp India", date: "Feb 24, 2026", amount: "₹4,25,000", status: "Paid", method: "Bank Transfer" },
-        { id: "INV-002", client: "Private Residence", date: "Feb 20, 2026", amount: "₹1,12,000", status: "Pending", method: "Cheque" },
-        { id: "INV-003", client: "Innovate Hub", date: "Feb 15, 2026", amount: "₹85,000", status: "Overdue", method: "Bank Transfer" },
-        { id: "INV-004", client: "Skyline Tower A", date: "Feb 10, 2026", amount: "₹12,40,000", status: "Paid", method: "Wire" },
-        { id: "INV-005", client: "Heritage Group", date: "Feb 05, 2026", amount: "₹2,10,000", status: "Pending", method: "UPI" },
-    ];
+    // New State for Invoice Creation
+    const [formData, setFormData] = useState({
+        client: "",
+        subTotal: 0,
+        taxRate: 18,
+        discount: 0,
+        gstType: "CGST_SGST" as GstType,
+        dueDate: new Date().toISOString().split('T')[0]
+    });
+
+    const gstBreakdown = useMemo(() => {
+        return calculateGst(formData.subTotal - formData.discount, formData.taxRate, formData.gstType);
+    }, [formData.subTotal, formData.taxRate, formData.gstType, formData.discount]);
+
+    const loadInvoices = async () => {
+        try {
+            setIsLoading(true);
+            setError("");
+            const { getInvoices } = await import("@/app/actions/invoice-actions");
+            const result = await getInvoices(businessId);
+            
+            if (result.success) {
+                setInvoices(result.invoices);
+            } else {
+                setError(result.error || "Failed to load invoices");
+            }
+        } catch (err) {
+            setError("Failed to load invoices");
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (businessId) {
+            loadInvoices();
+        }
+    }, [businessId]);
 
     const statuses = ["All", "Paid", "Pending", "Overdue"];
 
     const filteredInvoices = useMemo(() => {
-        return initialInvoices.filter(inv => {
+        return invoices.filter(inv => {
             const matchesSearch = inv.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                inv.id.toLowerCase().includes(searchQuery.toLowerCase());
+                inv.invoiceId.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesStatus = activeStatus === "All" || inv.status === activeStatus;
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, activeStatus]);
+    }, [searchQuery, activeStatus, invoices]);
 
     const financialStats = [
         { label: "Total Revenue", value: "₹ 45.2L", trend: "+12.5%", icon: <Banknote size={20} />, color: "text-emerald-600", bg: "bg-emerald-50" },
@@ -58,7 +122,7 @@ export default function FinancePage() {
                 iconColor="text-emerald-600"
             >
                 <div className="flex items-center gap-3">
-                    <button className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center gap-2 text-sm font-medium text-text-secondary">
+                    <button onClick={() => alert("Generating PDF Financial Report...")} className="h-11 px-4 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center gap-2 text-sm font-medium text-text-secondary">
                         <Download size={18} /> Financial Report
                     </button>
                     <button
@@ -253,10 +317,26 @@ export default function FinancePage() {
                                 </button>
                             </div>
 
-                            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setIsCreatingInvoice(false); }}>
+                            <form className="space-y-6" action={async (data) => {
+                                const res = await createInvoice(data);
+                                if (res.success) {
+                                    setIsCreatingInvoice(false);
+                                    setFormData({ ...formData, subTotal: 0, discount: 0 }); // Reset essential fields
+                                    alert("Invoice generated successfully!");
+                                } else {
+                                    alert(res.error);
+                                }
+                            }}>
+                                <input type="hidden" name="gstType" value={formData.gstType} />
+
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Client Selection</label>
-                                    <select className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10">
+                                    <select
+                                        name="client"
+                                        value={formData.client}
+                                        onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                                        className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                    >
                                         <option>Build Corp India</option>
                                         <option>Innovate Hub</option>
                                         <option>Skyline Tower A</option>
@@ -266,23 +346,127 @@ export default function FinancePage() {
 
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Total Amount</label>
-                                        <input type="text" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" placeholder="₹ 0.00" />
+                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Subtotal (Net)</label>
+                                        <div className="relative">
+                                            <input
+                                                name="subTotal"
+                                                type="number"
+                                                value={formData.subTotal || ""}
+                                                onChange={(e) => setFormData({ ...formData, subTotal: parseFloat(e.target.value) || 0 })}
+                                                className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                                placeholder="0.00"
+                                            />
+                                            <Calculator size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-300" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Tax Rate (%)</label>
+                                        <select
+                                            name="taxRate"
+                                            value={formData.taxRate}
+                                            onChange={(e) => setFormData({ ...formData, taxRate: parseInt(e.target.value) })}
+                                            className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                        >
+                                            <option value={5}>5% (Basic)</option>
+                                            <option value={12}>12% (Standard)</option>
+                                            <option value={18}>18% (Service/General)</option>
+                                            <option value={28}>28% (Luxury)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">GST Type</label>
+                                        <div className="flex bg-zinc-50 rounded-xl p-1 border border-zinc-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, gstType: "CGST_SGST" })}
+                                                className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all", formData.gstType === "CGST_SGST" ? "bg-white shadow-sm text-primary" : "text-zinc-400")}
+                                            >
+                                                Intra-state
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, gstType: "IGST" })}
+                                                className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all", formData.gstType === "IGST" ? "bg-white shadow-sm text-primary" : "text-zinc-400")}
+                                            >
+                                                Inter-state
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Due Date</label>
-                                        <input type="date" className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10" />
+                                        <input
+                                            name="dueDate"
+                                            type="date"
+                                            value={formData.dueDate}
+                                            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                                            className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10"
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest pl-1">Payment Notes</label>
-                                    <textarea rows={2} className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/10 resize-none" placeholder="Bank details, terms, etc."></textarea>
+                                {/* GST Breakdown Preview */}
+                                <div className="bg-zinc-900 rounded-2xl p-6 text-white space-y-3">
+                                    <div className="flex justify-between text-xs text-zinc-400 font-bold uppercase tracking-wider">
+                                        <span>Subtotal</span>
+                                        <span>₹ {formData.subTotal.toLocaleString()}</span>
+                                    </div>
+                                    {formData.gstType === "CGST_SGST" ? (
+                                        <>
+                                            <div className="flex justify-between text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
+                                                <span>CGST ({(formData.taxRate / 2).toFixed(1)}%)</span>
+                                                <span>₹ {gstBreakdown.cgst.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
+                                                <span>SGST ({(formData.taxRate / 2).toFixed(1)}%)</span>
+                                                <span>₹ {gstBreakdown.sgst.toLocaleString()}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex justify-between text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
+                                            <span>IGST ({formData.taxRate}%)</span>
+                                            <span>₹ {gstBreakdown.igst.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    <div className="pt-3 border-t border-white/10 flex justify-between items-center">
+                                        <span className="text-sm font-bold text-zinc-300">Total Amount</span>
+                                        <span className="text-2xl font-black text-emerald-400">₹ {gstBreakdown.totalAmount.toLocaleString()}</span>
+                                    </div>
                                 </div>
 
-                                <button className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all premium-shadow mt-4">
-                                    Finalize & Send Invoice
-                                </button>
+                                <div className="space-y-4 pt-6 border-t border-zinc-100 mt-6 md:col-span-2">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-bold text-primary">Compliance & e-Invoicing</h4>
+                                        <button
+                                            type="button"
+                                            onClick={() => alert("IRN Generation triggered with mock JSON payload!")}
+                                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                                        >
+                                            <Zap size={12} /> Generate IRN
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                                        <div className="w-16 h-16 bg-white rounded-lg border border-zinc-200 flex items-center justify-center text-zinc-300">
+                                            <QrCode size={32} />
+                                        </div>
+                                        <div className="flex-grow space-y-1">
+                                            <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">IRN (Mocked)</div>
+                                            <div className="text-xs font-mono text-primary truncate max-w-[200px]">48a92b...f7e10c</div>
+                                            <div className="text-[10px] text-emerald-600 font-bold uppercase">Status: IRN Ready</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-zinc-100 mt-6 flex justify-between md:col-span-2">
+                                    <button type="button" onClick={() => setIsCreatingInvoice(false)} className="h-10 px-4 rounded-xl text-primary text-xs font-bold hover:bg-zinc-50 transition-all border border-zinc-100">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="h-10 px-6 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all premium-shadow">
+                                        Generate Bill
+                                    </button>
+                                </div>
                             </form>
                         </motion.div>
                     </div>

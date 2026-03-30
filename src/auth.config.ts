@@ -10,13 +10,14 @@ export const authConfig = {
                 password: { label: "Password", type: "password" },
             },
             async authorize(credentials) {
-                // This is a mock authorize for development. 
+                // Mock authorize for development.
                 if (credentials?.email === "admin@upuc.com" && credentials?.password === "admin123") {
                     return {
                         id: "admin-1",
                         name: "Admin User",
                         email: "admin@upuc.com",
                         role: "ADMIN",
+                        businessId: "default-business-1",
                     };
                 }
                 return null;
@@ -28,12 +29,14 @@ export const authConfig = {
         jwt({ token, user }) {
             if (user) {
                 token.role = (user as any).role;
+                token.businessId = (user as any).businessId;
             }
             return token;
         },
         session({ session, token }) {
             if (session.user) {
                 (session.user as any).role = token.role;
+                (session.user as any).businessId = token.businessId;
             }
             return session;
         },
