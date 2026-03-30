@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client/index.js';
+import { PrismaClient } from '@prisma/client';
+import type { PrismaClient as PrismaClientType } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 const globalForPrisma = globalThis as unknown as {
@@ -9,7 +10,7 @@ const adapter = new PrismaBetterSqlite3({
     url: "file:dev.db"
 });
 
-export const prisma: PrismaClient =
+export const prisma: PrismaClientType =
     globalForPrisma.prisma ||
     new PrismaClient({
         adapter,
