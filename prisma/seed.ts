@@ -1,5 +1,5 @@
 // @ts-ignore - Prisma types are generated correctly
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client/index.js';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 const adapter = new PrismaBetterSqlite3({
