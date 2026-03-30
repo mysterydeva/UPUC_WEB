@@ -5,7 +5,6 @@ const adapter = new PrismaBetterSqlite3({
     url: "file:dev.db"
 });
 
-// @ts-ignore - Prisma types are generated correctly
 const prisma = new PrismaClient({
     adapter,
     log: ["query", "error", "warn"],
