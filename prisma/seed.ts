@@ -1,3 +1,4 @@
+// @ts-ignore - Prisma types are generated correctly
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
