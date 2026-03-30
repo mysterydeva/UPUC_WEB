@@ -18,7 +18,7 @@ export async function exportGSTR1(month: number, year: number) {
         const report = {
             gstin: "27AAAAA0000A1Z5",
             fp: `${month}${year}`,
-            b2b: invoices.map(inv => ({
+            b2b: invoices.map((inv: any) => ({
                 ctin: "27BBBBB0000B1Z6", // Mock client GSTIN
                 inv: [{
                     inum: inv.invoiceId,
@@ -47,7 +47,7 @@ export async function exportTallyData() {
         const invoices = await prisma.invoice.findMany();
         const csvContent = [
             "Date,Invoice No,Party Name,GSTIN,Voucher Type,Amount",
-            ...invoices.map(inv => `${inv.date.toISOString().split('T')[0]},${inv.invoiceId},${inv.client},MockGSTIN,Sales,${inv.totalAmount}`)
+            ...invoices.map((inv: any) => `${inv.date.toISOString().split('T')[0]},${inv.invoiceId},${inv.client},MockGSTIN,Sales,${inv.totalAmount}`)
         ].join("\n");
 
         return { success: true, csv: csvContent };

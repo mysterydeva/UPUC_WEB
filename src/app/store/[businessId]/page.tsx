@@ -50,7 +50,7 @@ export default async function BusinessStore({ params }: { params: { businessId: 
             {/* Product Grid */}
             <main className="flex-grow py-16 px-6 md:px-20 max-w-7xl mx-auto w-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {business.inventory.map((item) => (
+                    {business.inventory.map((item: any) => (
                         <div key={item.id} className="bg-white rounded-[2.5rem] p-6 border border-zinc-100 premium-shadow hover:scale-[1.02] transition-all group cursor-pointer">
                             <div className="aspect-square bg-zinc-100 rounded-[2rem] mb-6 flex items-center justify-center text-zinc-300 group-hover:bg-primary/5 group-hover:text-primary transition-all">
                                 <ShoppingBag size={48} strokeWidth={1} />

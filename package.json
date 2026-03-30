@@ -14,7 +14,7 @@
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-better-sqlite3": "^7.4.2",
     "@types/papaparse": "^5.5.2",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.8.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",

@@ -24,8 +24,11 @@ export default function InventoryPage() {
         const { getInventoryItems } = await import("@/app/actions/inventory-actions");
         const res = await getInventoryItems(businessId);
         setItems(res || []);
-
-        const cats = new Set(res.map((r: any) => r.category));
+        
+        const cats = new Set<string>((res || []).map((r: any) => {
+            const category = r.category;
+            return typeof category === 'string' ? category : String(category || '');
+        }));
         setCategories(["All", ...Array.from(cats)]);
     };
 

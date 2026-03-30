@@ -13,7 +13,7 @@ export async function generateGSTR1JSON(businessId: string, month: number, year:
         }
     });
 
-    const b2b = invoices.map(inv => ({
+    const b2b = invoices.map((inv: any) => ({
         ctin: "29AAAAA0000A1Z5", // Mock counterparty
         inv: [{
             inum: inv.invoiceId,
@@ -51,7 +51,7 @@ export async function exportTallyCSV(businessId: string) {
 
     // Generate raw CSV string
     let csv = "Voucher Date,Voucher Type,Voucher No,Party Name,Sales Ledger,GST Rate,Total Amount\n";
-    invoices.forEach(inv => {
+    invoices.forEach((inv: any) => {
         csv += `${new Date(inv.date).toLocaleDateString("en-GB")},Sales,${inv.invoiceId},${inv.client},Local Sales,${inv.taxRate},${inv.totalAmount}\n`;
     });
     return csv;

@@ -8,7 +8,7 @@ export async function getDashboardAlerts(businessId?: string) {
             where: businessId ? { businessId } : undefined,
             select: { name: true, stock: true, minStock: true, unit: true }
         });
-        const lowStock = inventory.filter(i => i.stock <= i.minStock);
+        const lowStock = inventory.filter((i: any) => i.stock <= i.minStock);
 
         const invoices = await prisma.invoice.findMany({
             where: {
