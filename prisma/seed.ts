@@ -1,11 +1,11 @@
-// @ts-ignore - Prisma types are generated correctly
-import { PrismaClient } from '@prisma/client/index.js';
+import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 const adapter = new PrismaBetterSqlite3({
     url: "file:dev.db"
 });
 
+// @ts-ignore - Prisma types are generated correctly
 const prisma = new PrismaClient({
     adapter,
     log: ["query", "error", "warn"],
