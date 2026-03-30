@@ -4,16 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function getQuotations() {
-    console.log('🔧 Server Action: getQuotations called');
     try {
-        console.log('🗄️ Querying database for quotations...');
         const quotations = await prisma.quotation.findMany({
             orderBy: { createdAt: 'desc' },
         });
-        console.log('📈 Database query result:', { quotationsCount: quotations.length, quotations });
         return { success: true, quotations };
     } catch (error) {
-        console.error('💥 Database error in getQuotations:', error);
+        console.error("Failed to fetch quotations:", error);
         return { success: false, error: "Failed to fetch quotations" };
     }
 }

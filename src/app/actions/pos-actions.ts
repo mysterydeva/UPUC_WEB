@@ -39,7 +39,8 @@ export async function processPOSCheckout(businessId: string, cart: any[], paymen
                 taxRate: 18,
                 totalAmount,
                 status: "Paid",
-                method: paymentMethod
+                method: paymentMethod,
+                dueDate: new Date()
             }
         });
 

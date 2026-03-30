@@ -15,6 +15,7 @@ import {
     RefreshCcw
 } from "lucide-react";
 import { getBankAccounts, getTransactions, addBankAccount, addTransaction } from "@/app/actions/banking-actions";
+import { cn } from "@/lib/utils";
 
 export default function BankingPage() {
     const { data: session } = useSession();

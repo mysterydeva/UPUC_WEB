@@ -35,13 +35,13 @@ interface DatabaseInvoice {
     taxAmount: number;
     discount: number;
     totalAmount: number;
-    gstType?: string;
+    gstType?: string | null;
     status: string;
-    method?: string;
-    date: string;
-    dueDate: string;
-    createdAt: string;
-    updatedAt: string;
+    method?: string | null;
+    date: Date | string;
+    dueDate: Date | string;
+    createdAt: Date | string;
+    updatedAt: Date | string;
 }
 
 export default function FinancePage() {
@@ -77,7 +77,7 @@ export default function FinancePage() {
             const result = await getInvoices(businessId);
             
             if (result.success) {
-                setInvoices(result.invoices);
+                setInvoices(result.invoices || []);
             } else {
                 setError(result.error || "Failed to load invoices");
             }
@@ -245,8 +245,10 @@ export default function FinancePage() {
                                     >
                                         <td className="px-8 py-5 font-bold text-primary font-mono text-sm uppercase tracking-tighter">{inv.id}</td>
                                         <td className="px-6 py-5 font-medium text-text-secondary">{inv.client}</td>
-                                        <td className="px-6 py-5 text-sm font-medium text-zinc-400">{inv.date}</td>
-                                        <td className="px-6 py-5 font-bold text-primary">{inv.amount}</td>
+                                        <td className="px-6 py-5 text-sm font-medium text-zinc-400">
+                                            {typeof inv.date === 'string' ? new Date(inv.date).toLocaleDateString() : inv.date.toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-5 font-bold text-primary">{inv.totalAmount}</td>
                                         <td className="px-6 py-5">
                                             <span className={cn(
                                                 "px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider",

@@ -36,10 +36,8 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    console.log('🏗️ DashboardLayout component rendering');
     const pathname = usePathname();
     const { data: session } = useSession();
-    console.log('🏢 Dashboard Layout - Path:', pathname, 'Session:', !!session);
 
     const sidebarGroups = [
         {

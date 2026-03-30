@@ -63,37 +63,28 @@ export default function QuotationsPage() {
     ];
 
     const loadQuotations = async () => {
-        console.log('🚀 Starting loadQuotations function');
         try {
             setIsLoading(true);
             setError("");
-            console.log('📦 Importing getQuotations action');
             
             const { getQuotations } = await import("@/app/actions/quotation-actions");
-            console.log('📞 Calling getQuotations...');
             const res = await getQuotations();
-            console.log('📊 getQuotations result:', res);
             
             if (res.success) {
-                console.log('✅ Successfully loaded quotations:', res.quotations?.length);
                 setQuotations(res.quotations || []);
             } else {
-                console.log('❌ Failed to load quotations, using fallback data');
                 setQuotations(initialQuotations);
             }
         } catch (err) {
-            console.log('💥 Exception in loadQuotations:', err);
             setError("Failed to load quotations");
             setQuotations(initialQuotations);
             console.error(err);
         } finally {
-            console.log('🏁 loadQuotations finished, setting isLoading to false');
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        console.log('🎯 Quotations useEffect triggered');
         loadQuotations();
     }, []);
 
@@ -113,7 +104,6 @@ export default function QuotationsPage() {
     const statuses = ["All", "Draft", "Sent", "Approved", "Rejected"];
 
     const formatDate = (date: Date | string | null | undefined) => {
-        console.log('📅 Formatting date:', date);
         if (!date) return 'N/A';
         try {
             const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -124,7 +114,6 @@ export default function QuotationsPage() {
     };
 
     const filteredQuotations = useMemo(() => {
-        console.log('🔍 Filtering quotations:', { quotationsCount: quotations.length, searchQuery, activeStatus });
         const sourceData = quotations.length > 0 ? quotations : initialQuotations;
         return sourceData.filter(qtn => {
             const matchesSearch = (qtn.clientName || qtn.client).toLowerCase().includes(searchQuery.toLowerCase()) ||
