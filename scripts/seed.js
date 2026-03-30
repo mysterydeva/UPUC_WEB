@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+const { PrismaClient } = require('@prisma/client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 
 const adapter = new PrismaBetterSqlite3({
     url: "file:dev.db"
@@ -23,81 +23,12 @@ async function main() {
       gstin: '29AAAPL1234C1ZV',
       address: '123 Industrial Area, Bangalore - 560001',
       phone: '+91 80 1234 5678',
-      email: 'info@upuc.com',
-      currency: 'INR',
+      email: 'info@upucwindows.com',
+      website: 'https://upucwindows.com',
     },
   });
 
-  console.log('✅ Business created:', business.name);
-
-  // Create sample inventory items
-  const inventoryItems = [
-    { name: 'Aluminum Profile - 6ft', category: 'Profile', stock: 150, unit: 'Pcs', minStock: 20, price: 850 },
-    { name: 'Tempered Glass - 6mm', category: 'Glass', stock: 75, unit: 'SqFt', minStock: 15, price: 120 },
-    { name: 'UPVC Handle Set', category: 'Hardware', stock: 200, unit: 'Sets', minStock: 25, price: 180 },
-    { name: 'EPDM Gasket', category: 'Hardware', stock: 500, unit: 'Meters', minStock: 50, price: 25 },
-    { name: 'Sliding Wheel', category: 'Hardware', stock: 300, unit: 'Pcs', minStock: 40, price: 45 },
-  ];
-
-  for (const item of inventoryItems) {
-    await prisma.inventoryItem.create({
-      data: {
-        ...item,
-        businessId: business.id,
-        status: item.stock > item.minStock ? 'In Stock' : 'Low Stock',
-      },
-    });
-  }
-
-  console.log('✅ Inventory items created');
-
-  // Create sample leads
-  const leads = [
-    {
-      leadId: 'LD-2024-001',
-      clientName: 'Rajesh Kumar',
-      contact: '+91 98450 12345',
-      projectType: 'Residential',
-      status: 'Enquiry',
-      source: 'Reference',
-      businessId: business.id,
-    },
-    {
-      leadId: 'LD-2024-002',
-      clientName: 'Sneha Reddy',
-      contact: '+91 98450 67890',
-      projectType: 'Commercial',
-      status: 'Measured',
-      source: 'Social',
-      businessId: business.id,
-    },
-    {
-      leadId: 'LD-2024-003',
-      clientName: 'Buildwell Developers',
-      contact: '+91 80 2345 6789',
-      projectType: 'Commercial',
-      status: 'Quoted',
-      source: 'Direct',
-      businessId: business.id,
-    },
-  ];
-
-  for (const lead of leads) {
-    await prisma.lead.upsert({
-      where: { leadId: lead.leadId },
-      update: lead,
-      create: lead,
-    });
-  }
-
-  console.log('✅ Sample leads created');
-
-  // Store created leads for reference
-  const createdLeads = await prisma.lead.findMany({
-    where: { businessId: business.id },
-    orderBy: { createdAt: 'desc' },
-    take: 3
-  });
+  console.log('✅ Default business created:', business.name);
 
   // Create sample parties
   const parties = [
@@ -116,7 +47,6 @@ async function main() {
   const quotations = [
     {
       quotationId: 'QTN-2024-001',
-      leadId: createdLeads[0].id, // Link to first lead
       client: 'Rajesh Kumar',
       amount: 53100,
       status: 'Sent',
@@ -125,7 +55,6 @@ async function main() {
     },
     {
       quotationId: 'QTN-2024-002',
-      leadId: createdLeads[1].id, // Link to second lead
       client: 'Sneha Reddy',
       amount: 142500,
       status: 'Approved',
@@ -134,7 +63,6 @@ async function main() {
     },
     {
       quotationId: 'QTN-2024-003',
-      leadId: createdLeads[2].id, // Link to third lead
       client: 'Buildwell Developers',
       amount: 983000,
       status: 'Draft',
@@ -153,17 +81,10 @@ async function main() {
 
   console.log('✅ Sample quotations created');
 
-  // Store created quotations for reference
-  const createdQuotations = await prisma.quotation.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 3
-  });
-
   // Create sample job orders
   const jobOrders = [
     {
       jobOrderId: 'JO-2024-001',
-      quotationId: createdQuotations[1].id, // Link to approved quotation
       name: 'Sneha Reddy - UPVC Windows',
       client: 'Sneha Reddy',
       progress: 25,
@@ -171,7 +92,6 @@ async function main() {
     },
     {
       jobOrderId: 'JO-2024-002',
-      quotationId: createdQuotations[0].id, // Link to sent quotation
       name: 'Rajesh Kumar - Sliding Doors',
       client: 'Rajesh Kumar',
       progress: 60,
@@ -348,10 +268,11 @@ async function main() {
     },
     {
       type: 'Payment Out',
-      amount: 25000,
-      reference: 'Vendor Payment',
+      amount: 12000,
+      reference: 'CHEQUE123456',
       bankAccountId: bankAccount.id,
       businessId: business.id,
+      linkedInvoiceId: createdInvoices[1].id,
     },
   ];
 
@@ -360,18 +281,6 @@ async function main() {
   }
 
   console.log('✅ Sample transactions created');
-
-  // Update bank balance
-  await prisma.bankAccount.update({
-    where: { id: bankAccount.id },
-    data: {
-      balance: {
-        increment: transactions[0].amount - transactions[1].amount,
-      },
-    },
-  });
-
-  console.log('✅ Bank balance updated');
 
   console.log('🎉 Database seeding completed successfully!');
 }
